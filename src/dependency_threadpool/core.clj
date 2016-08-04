@@ -8,43 +8,47 @@
 (def running-functions (atom #{})) ; set of running functions
 (def queued-functions (atom {}))  ; map of uid's of running functions to a list of other functions that are waiting on them
 
+(defn debug [& args]
+  (.write *out* (str (clojure.string/join " " args) "\n"))) 
+
 (defn queue [task & dependency] 
   
   (let
     [uid (UUID/randomUUID)
      dep  (first dependency)
      wrapped-function (fn []
-                        (println "executing id: " uid)
+                        (debug "executing id: " uid)
                         ; run the given task 
                         (task)
                         ; take this function out of the list of running functions
-                        ;(println "UID:" uid)
-                        ;(println "BEFORE" @running-functions)
+                        ;(debug "UID:" uid)
+                        (debug "BEFORE" @running-functions)
                         (swap! running-functions disj uid)
-                        ;(println "AFTER" @running-functions)
+                        (debug "AFTER" @running-functions)
                         ; trigger all dependee functions
 
                         (apply
-                          (fn [task] (.submit @pool task))
+                          (fn [task] (debug "task:" task) (task) (.submit @pool task))
                           (get @queued-functions uid))
-                        ; (println "FUNC:" (first (get @queued-functions uid)))
+                        ; (debug "FUNC:" (first (get @queued-functions uid)))
                         (swap! queued-functions dissoc uid)
                         )] 
     (swap! running-functions conj uid)
     (if (and dep (some #{dep} @running-functions))
       ; contains dependency (ie dependency is currently running or queued)
       (do
+        (debug "queueing id: " uid) 
         (swap! queued-functions
                (fn [queued-functions]
                 ; associate the things (update the map of ids -> dependee functions) 
                  (assoc queued-functions dep (conj (get queued-functions dep) wrapped-function))
                  ))
-        ; (println @queued-functions)
+        ; (debug @queued-functions)
         
         )
       ; does not contain dependency
       (do
-        (println "submitting") 
+        (debug "submitting id:" uid) 
         (.submit @pool wrapped-function)))
     
     uid ; return the uid because, yea
@@ -62,16 +66,29 @@
   (reset! pool (Executors/newFixedThreadPool (if (nil? nthreads) 5 (first nthreads))))
   )
 
-(defn wait [& ms]
+; UTILITY
+(defn wait-for-queueage []
+  ; there has to be a better way to do this
+  ; also need to think about a possible lock - set a timeout, and return true/false if queue
+  ; is actually empty?
+  (while (not (empty? @queued-functions))
+    (do
+     (debug "queue:" @queued-functions)
+     (Thread/sleep 100)))
+  )
+
+(defn await-termination [& ms]
   (.awaitTermination @pool (if (nil? ms) 1000 (first ms)) TimeUnit/MILLISECONDS)
   )
 
 (defn -main []
-  (println "Hello World!")
+  (debug "Hello World!")
   (let [
         uid1  (queue (fn []
-                       (println "Function executed")))])
+                       (debug "Function executed")))])
   (queue (fn []
-           (println "Function 2 executed")))
+           (debug "Function 2 executed")))
   (shutdown)
   )
+
+

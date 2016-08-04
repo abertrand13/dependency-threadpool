@@ -9,8 +9,9 @@
         uid2  (pool/queue (fn [] (swap! string str "cd")) uid1)
         uid3  (pool/queue (fn [] (swap! string str "ef")) uid2)
         uid4  (pool/queue (fn [] (swap! string str "gh")) uid3)
+        _     (pool/wait-for-queueage)
         _     (pool/shutdown)
-        _     (pool/wait)
+        _     (pool/await-termination 5000)
         ] 
     (testing "Simple Test 1 :: One dep chain, 4 functions"
       (is (= @string "abcdefgh")))))
@@ -27,8 +28,9 @@
           uid2b   (pool/queue (fn [] (swap! string2 str "ij")) uid2a)
           uid3a   (pool/queue (fn [] (swap! string1 str "ef")) uid1b)
           uid3b   (pool/queue (fn [] (swap! string2 str "kl")) uid2b)
+          
           _       (pool/shutdown)
-          _       (pool/wait 1000)
+          _       (pool/await-termination 1000)
           ]
       (is (= @string1 "abcdef"))
       (is (= @string2 "ghijkl"))))
@@ -42,7 +44,7 @@
           uid2    (pool/queue (fn [] (swap! string str "cd") (Thread/sleep 100)) uid1)
           uid3    (pool/queue (fn [] (swap! string str "ef") (Thread/sleep 100)) uid2)
           _       (pool/shutdown)
-          _       (pool/wait)
+          _       (pool/await-termination)
           ]
       (is (= @string "abcdef"))))
   )
