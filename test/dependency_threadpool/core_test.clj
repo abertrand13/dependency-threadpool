@@ -26,9 +26,9 @@
           uid2a   (pool/queue (fn [] (swap! string2 str "gh")))
           uid1b   (pool/queue (fn [] (swap! string1 str "cd")) uid1a)
           uid2b   (pool/queue (fn [] (swap! string2 str "ij")) uid2a)
-          uid3a   (pool/queue (fn [] (swap! string1 str "ef")) uid1b)
-          uid3b   (pool/queue (fn [] (swap! string2 str "kl")) uid2b)
-          
+          uid1c   (pool/queue (fn [] (swap! string1 str "ef")) uid1b)
+          uid2c   (pool/queue (fn [] (swap! string2 str "kl")) uid2b)
+          _       (pool/wait-for-queueage) 
           _       (pool/shutdown)
           _       (pool/await-termination 1000)
           ]
@@ -43,6 +43,7 @@
           uid1    (pool/queue (fn [] (swap! string str "ab") (Thread/sleep 100)))
           uid2    (pool/queue (fn [] (swap! string str "cd") (Thread/sleep 100)) uid1)
           uid3    (pool/queue (fn [] (swap! string str "ef") (Thread/sleep 100)) uid2)
+          _       (pool/wait-for-queueage)
           _       (pool/shutdown)
           _       (pool/await-termination)
           ]
