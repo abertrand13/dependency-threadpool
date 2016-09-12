@@ -7,12 +7,13 @@
 (import '(java.util.concurrent TimeUnit))
 
 (def debug-output-on false)
+(def default-num-threads 10)
 (def pool (atom (Executors/newFixedThreadPool 5)))
 (def running-functions (atom #{})) ; set of running functions
 (def queued-functions (atom {}))  ; map of uid's of running functions to a list of other functions that are waiting on them
 (def no-queued-functions (atom (promise)))
 
-(defn debug [& args]
+(defn- debug [& args]
   (if debug-output-on (.write *out* (str (clojure.string/join " " args) "\n")))) 
 
 (defn queue [task & dependency] 
@@ -94,16 +95,16 @@
   (.shutdown @pool)
   )
 
-(defn initialize [& nthreads]
+(defn initialize [& numthreads]
   ; add check to make sure it doesn't already exist?
-  (let [arg     (first nthreads)
-        threads (if (nil? arg) 5 arg)
+  (let [arg     (first numthreads)
+        threads (if (nil? arg) default-num-threads arg)
         ]
     (reset! pool (Executors/newFixedThreadPool threads))))
 
 ; UTILITY
 (defn wait-for-queueage []
-  ; also need to think about a possible lock - set a timeout, and return true/false if queue
+  ; also need to think about a possible lock - take in a timeout, and return true/false if queue
   ; is actually empty?
 
   ; some weird atom/promise-y shiz.
