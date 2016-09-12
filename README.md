@@ -6,11 +6,11 @@ A Clojure library designed as a thin layer over a threadpool for dependency spec
 ## Example
 
 Say, for example, that we are given five functions which need to be run with the following constraints:
-	1. `f1`, which has no depedencies
-	2. `f2`, a relatively long-function which also has no dependencies
-	3. `f3`, which depends on `f1` and thus needs to run after it has completed
-	4. `f4`, which also depends on `f1`
-	5. `f5`, which depends on `f2`
+  1. `f1`, which has no depedencies
+  2. `f2`, a relatively long-function which also has no dependencies
+  3. `f3`, which depends on `f1` and thus needs to run after it has completed
+  4. `f4`, which also depends on `f1`
+  5. `f5`, which depends on `f2`
 
 A normal thread pool will be insufficient here, as it will not be able to guarantee the proper order of execution.  We could do it synchronously, but of course this would be inefficient.
 
@@ -26,8 +26,8 @@ Enter this library, which allows this order of execution to be specified and exe
 	(pool/queue f4 func1)
 	(pool/queue f5 func2)
 	(pool/wait-for-queueage) ; Following are routine shutdown steps)
-	(pool/shutdown 5000)	
-	(pool/await-termination))) ; Blocks until graceful shutdown occurs, or the timeout of 5 seconds has been reached
+	(pool/shutdown)	
+	(pool/await-termination 5000))) ; Blocks until graceful shutdown occurs, or the timeout of 5 seconds has been reached
 
 ```
 
