@@ -5,13 +5,29 @@
 (deftest ^:simple simple-test
   (let [_     (pool/initialize)
         string (atom "") 
-        uid1  (pool/queue (fn [] (swap! string str "ab")))
-        uid2  (pool/queue (fn [] (swap! string str "cd")) uid1)
-        uid3  (pool/queue (fn [] (swap! string str "ef")) uid2)
-        uid4  (pool/queue (fn [] (swap! string str "gh")) uid3)
+        uid1  (pool/queue (fn []
+                            (swap! string str "ab")
+                            ; (println @string)
+
+                            ))
+        uid2  (pool/queue (fn []
+                            (swap! string str "cd")
+                            ;(println @string)
+
+                            ) uid1)
+        uid3  (pool/queue (fn []
+                            (swap! string str "ef")
+                            ; (println @string)
+                            
+                            ) uid2)
+        uid4  (pool/queue (fn []
+                            (swap! string str "gh")
+                            ; (println @string)
+                            
+                            ) uid3)
         _     (pool/wait-for-queueage)
         _     (pool/shutdown)
-        _     (pool/await-termination 5000)
+        _     (pool/await-termination 1000)
         ] 
     (testing "Simple Test 1 :: One dep chain, 4 functions"
       (is (= @string "abcdefgh")))))
@@ -40,9 +56,9 @@
   (testing "One dependency chain with sleeps in the middle"
     (let [_       (pool/initialize)
           string  (atom "")
-          uid1    (pool/queue (fn [] (swap! string str "ab") (Thread/sleep 100)))
-          uid2    (pool/queue (fn [] (swap! string str "cd") (Thread/sleep 100)) uid1)
-          uid3    (pool/queue (fn [] (swap! string str "ef") (Thread/sleep 100)) uid2)
+          uid1    (pool/queue (fn [] (swap! string str "ab") (Thread/sleep 1000)))
+          uid2    (pool/queue (fn [] (swap! string str "cd") (Thread/sleep 1000)) uid1)
+          uid3    (pool/queue (fn [] (swap! string str "ef") (Thread/sleep 1000)) uid2)
           _       (pool/wait-for-queueage)
           _       (pool/shutdown)
           _       (pool/await-termination)

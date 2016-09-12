@@ -1,6 +1,6 @@
 (ns dependency-threadpool.core)
 
-(use '( clojure pprint))
+(use '(clojure pprint))
 
 (import '(java.util.concurrent Executors))
 (import '(java.util UUID))
@@ -21,83 +21,94 @@
     [uid (UUID/randomUUID)
      dep  (first dependency)
      wrapped-function (fn []
-                        (debug "executing id: " uid)
-                        ; (println "executing function")
                         ; run the given task 
                         (task)
-                        ; (println "finished executing")
                         ; take this function out of the list of running functions
-                        ;(debug "UID:" uid)
-                        (debug "BEFORE" @running-functions)
-                        (swap! running-functions disj uid)
-                        (debug "AFTER" @running-functions)
-                        ; trigger all dependee functions
+                        
+                        ; the debug statement here makes it pass
+                        ; while down below makes it fail.
+                        ; why?
+                        ; maybe what happens is that the functions finishes executing.
+                        ; then proceeds to try to dequeue it's dependee functions
+                        ; (there's nothing there)
+                        ; then the dependee gets queued...?
+                        ; but then never gets dequeued
+                        ; that shouldn't happen though, since we take *this* function
+                        ; out of the list of running functions before we try to dequeue
+                        ; potential sequence:
+                        ; 1. dependee tries to execute, sees dependency is still running
+                        ; 2. dependency finishes, marks as done
+                        ; 2.5 This is where the delay comes in from the passing println,
+                        ; 2.5 Probably gives the dependee a chance to interleave
+                        ; 3. dependency tries to dequeue, nothing is there
+                        ; 4. dependee finally gets around to queueing
+                        ; 5. what would make this happen so regularly and predictably?
+                        ; maybe its that the queuing function is huge?
+                        ; you for sure need a mutex on some stuff...
+                        ; Maybe for raw concurrency programming like this, it makes a
+                        ; degree of sense.  Now how do you do a mutex, exactly...?
 
-                        ; (println "pre-dequeue")
+                        ; trigger all dependee functions
+                        ; (println "a") 
+                        (swap! running-functions disj uid)
+                        (locking running-functions
                         (dorun (map
-                          (fn [task]  (.submit @pool task))
+                          (fn [task]
+                            (.submit @pool task)
+                            )
                           (get @queued-functions uid)))
-                        ; (debug "FUNC:" (first (get @queued-functions uid)))
-                        ; (println "dequeueing") 
-                        (swap! queued-functions dissoc uid)
-                        ; trigger if waiting
-                        (println "attempting trigger")
+                        (swap! queued-functions dissoc uid))
+                        
+                        ; trigger if main thread is waiting for all functions to be in pool
+                        ; (println "c")
                         (if (empty? @queued-functions) 
                           (do
-                            ; (println "delivering") 
+                            ; (println "d") 
                             (deliver @no-queued-functions true)))
-                        )] 
+                        ; (println "b")
+                        )]  
     (swap! running-functions conj uid)
+    (locking running-functions 
     (if (and dep (some #{dep} @running-functions))
-      ;  contains dependency (ie dependency is currently running or queued)
+      ; contains dependency (ie dependency is currently running or queued)
       (do
-        (debug "queueing id: " uid)
-        (if (realized? @no-queued-functions) (reset! no-queued-functions (promise)))
+        (reset! no-queued-functions (promise))
+        ; (println "<")
         (swap! queued-functions
                (fn [queued-functions]
-                ; associate the things (update the map of ids -> dependee functions) 
+                 ; associate the things (update the map of ids -> dependee functions) 
                  (assoc queued-functions dep (conj (get queued-functions dep) wrapped-function))
-                 ))
-        ; (println "function queued")
-        ; (debug @queued-functions)
-        
+                 )) 
+        ; (println ">")
         )
       ; does not contain dependency
       (do 
-        (debug "submitting id:" uid) 
         (.submit @pool wrapped-function)
-        ; (println "function queued without dependency") 
-        ))
-    
+        )))
     uid ; return the uid because, yea
     ))
 
 ; SETUP AND DECONSTRUCTION FUNCTIONS
 
 (defn shutdown []
-  (debug "THREADPOOL: shutting down")
   (.shutdown @pool)
   )
 
 (defn initialize [& nthreads]
   ; add check to make sure it doesn't already exist?
-  ; in an interesting quirk, variadic arguments actually get passed as an ArraySeq (hence first)
-  (reset! pool (Executors/newFixedThreadPool (if (nil? nthreads) 5 (first nthreads))))
-  )
+  (let [arg     (first nthreads)
+        threads (if (nil? arg) 5 arg)
+        ]
+    (reset! pool (Executors/newFixedThreadPool threads))))
 
 ; UTILITY
-
 (defn wait-for-queueage []
   ; also need to think about a possible lock - set a timeout, and return true/false if queue
   ; is actually empty?
 
   ; some weird atom/promise-y shiz.
   ; block until it's available then reset
-  (debug "waiting")
-  ; (println @queued-functions)
-  ; (println (empty? @queued-functions))
-  (if (deref @no-queued-functions 1000 false) (reset! no-queued-functions (promise)))
-  (clojure.pprint/pprint @queued-functions)
+  (if (deref @no-queued-functions) (reset! no-queued-functions (promise)))
   )
 
 (defn await-termination [& ms]
